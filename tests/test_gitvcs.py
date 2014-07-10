@@ -11,7 +11,6 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
-import unittest
 import unittest2
 from thrift_medusa.utils.config import Config
 from thrift_medusa.vcs.GitVCS import GitVCS

@@ -217,7 +217,6 @@ class Config():
                     return ins
             except Exception as e:
                 self.is_vcs = False #disabeling vcs.
-                self.log(e.message)
                 raise RuntimeError("Could not create an instance of VCS")
             return None
 

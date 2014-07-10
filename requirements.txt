@@ -9,3 +9,6 @@ unittest2
 httpretty
 mock
 GitPython>=0.3.2.RC1
+networkx
+numpy
+matplotlib

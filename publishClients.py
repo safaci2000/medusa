@@ -12,12 +12,14 @@
  See the License for the specific language governing permissions and
  limitations under the License.
 """
+from thrift_medusa.thrift.thrift import Thrift
 
 __author__ = 'sfaci'
 
 import sys
 import subprocess
 import argparse
+import numpy as np
 
 from thrift_medusa.utils.wize_utils import *
 from thrift_medusa.utils.config import Config
@@ -172,6 +174,82 @@ def set_compiler(override_compiler):
     config.set_thrift_option("compilers", [compiler])
 
 
+def sanitize(node_name):
+    return node_name.replace("wizecommerce.", "")
+
+
+def add_visualization(graph, thrift_file, th):
+    if th.is_service(sanitize(thrift_file)):
+        pass
+    graph.add_node(sanitize(thrift_file))
+    properties = th.read_thrift_properties(thrift_file)
+    graph.node[sanitize(thrift_file)] = properties
+
+    deps = th.read_thrift_dependencies(thrift_file)
+    for dep in deps:
+        sanitized_thrift = sanitize(thrift_file)
+        graph.add_edge(sanitized_thrift, sanitize(dep))
+        properties = th.read_thrift_properties(dep)
+        graph.node[sanitized_thrift] = properties
+        if len(th.read_thrift_dependencies(dep)) > 0:
+            add_visualization(graph, dep, th)
+
+
+def display_visualization(thrift_file):
+    """
+    Notes:
+        http://matplotlib.org/mpl_toolkits/mplot3d/index.html
+        http://matplotlib.org/
+        http://code.enthought.com/projects/mayavi/documentation.php
+        https://networkx.github.io/documentation/latest/examples/drawing/labels_and_colors.html
+
+
+    """
+    thrift_objects = []
+    if thrift_file is None:
+        config = Config()
+        business_objects = build_file_list(config.get_path(type="business_object"), ".thrift")
+        service_objects = build_file_list(config.get_path(type="service_object"), ".thrift")
+        enum_objects = build_file_list(config.get_path(type="enum_object"), ".thrift")
+        exception_objects = build_file_list(config.get_path(type="exception_object"), ".thrift")
+        thrift_objects = service_objects + business_objects + enum_objects + exception_objects
+    else:
+        thrift_objects.append(thrift_file)
+
+    import networkx as nx
+    import matplotlib.pyplot as plt
+    import mpl_toolkits.mplot3d
+    from networkx.readwrite import json_graph
+    import http_server
+    import json
+    graph = nx.Graph()
+    ##generate graph for  args.thrift_file
+    th = Thrift("Dummy")
+    #thrift_file = os.path.basename(thrift_file)
+    for some_file in thrift_objects:
+        some_file = os.path.basename(some_file)
+        add_visualization(graph, some_file, th)
+
+    # nx.draw(graph,  node_color = np.linspace(0, 1, len(graph.nodes())))
+    ###
+    d = json_graph.node_link_data(graph) # node-link format to serialize
+    json.dump(d, open('/tmp/force.json','w'))
+    print('Wrote node-link JSON data to tmp/force.json')
+    http_server.load_url('tmp/force.html')
+    print('Or copy all files in force/ to webserver and load force/force.html')
+
+
+
+
+    nx.draw(graph)
+    plt.savefig("/tmp/path.png")
+    #plt.show()
+
+    print graph.nodes()
+    nx.write_graphml(graph, '/tmp/so.graphml')
+
+
+
 def main():
     parser = argparse.ArgumentParser(description='Client Generation Script')
     parser.add_argument('--local', action="store_true", dest="local", default=False, help="Enables Local Mode")
@@ -181,6 +259,8 @@ def main():
                         help="Enables RubyMode, default is Ruby + Java (Local Mode Only)")
     parser.add_argument('--java', action="store_true", dest="java", default=False,
                         help="Enables JavaMode, default is Ruby + Java  (Local Mode Only) ")
+    parser.add_argument('--visualize', action="store_true", dest="visualize", default=False,
+                        help="Enables visualization mode")
     parser.add_argument('--thrift-file', action="store", dest="thrift_file", type=str,
                         help="Override list of services, and use the one specified (Local Mode Only)\nThis overrides vcs intelligence")
     parser.add_argument('--config', action="store", dest="config", type=str,
@@ -232,6 +312,8 @@ def main():
         import cProfile
 
         cProfile.run('profileProject()')
+    elif args.visualize:
+        display_visualization(args.thrift_file)
     else:
         # Create Repo Structure
         publish_client.create_structure()
